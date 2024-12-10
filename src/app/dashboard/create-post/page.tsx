@@ -13,6 +13,7 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { app } from "@/firebase";
+import { useRouter } from "next/navigation";
 
 import { CircularProgressbar } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
@@ -29,6 +30,7 @@ interface FormDataProps {
   image?: string;
   title?: string;
   category?: string;
+  content?: string;
 }
 
 const CreatePostPage = () => {
@@ -37,6 +39,9 @@ const CreatePostPage = () => {
   const [imageUploadProgress, setImageUploadProgress] = useState<number>(0);
   const [imageUploadError, setImageUploadError] = useState<string>("");
   const [formData, setFormData] = useState<FormDataProps>({});
+  const [publishError, setPublishError] = useState("");
+
+  const router = useRouter();
 
   const handleUploadImage = async () => {
     try {
@@ -76,6 +81,34 @@ const CreatePostPage = () => {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/posts/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...formData,
+          userMongoId: user?.publicMetadata.userMongoId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPublishError(data.message);
+        return;
+      }
+      if (res.ok) {
+        setPublishError("");
+        router.push(`/post/${data.slug}`);
+      }
+    } catch (error) {
+      setPublishError("Something went wrong");
+      console.log(error);
+    }
+  };
+
   const addImageToPost = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -93,7 +126,7 @@ const CreatePostPage = () => {
         <h1 className="text-center text-3xl my-7 font-semibold">
           Create a post
         </h1>
-        <form className="flex flex-col gap-4">
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4 sm:flex-row justify-between">
             <TextInput
               type="text"
@@ -101,8 +134,15 @@ const CreatePostPage = () => {
               required
               id="title"
               className="flex-1"
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
             />
-            <Select>
+            <Select
+              onChange={(e) =>
+                setFormData({ ...formData, category: e.target.value })
+              }
+            >
               <option value="uncategorized">Select a category</option>
               <option value="javascript">JavaScript</option>
               <option value="reactjs">React.js</option>
@@ -148,6 +188,9 @@ const CreatePostPage = () => {
             theme="snow"
             placeholder="Write something..."
             className="h-72 mb-12"
+            onChange={(value) => {
+              setFormData({ ...formData, content: value });
+            }}
           />
           <Button type="submit" gradientDuoTone="purpleToPink">
             Publish
